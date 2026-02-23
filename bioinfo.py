@@ -21,6 +21,22 @@ __version__ = "0.5"         # Read way more about versioning here:
 DNAbases = set('ATGCNatcgn')
 RNAbases = set('AUGCNaucgn')
 
+# IUPAC codes for degenerate bases, useful for motif searching
+
+IUPAC = {
+    'A': 'A', 'C': 'C', 'G': 'G', 'T': 'T', 'U': '[TU]',
+    'R': '[AG]',  # puRine
+    'Y': '[CT]',  # pYrimidine
+    'S': '[GC]',  # Strong
+    'W': '[AT]',  # Weak
+    'K': '[GT]',  # Keto
+    'M': '[AC]',  # aMino
+    'B': '[CGT]', # not A
+    'D': '[AGT]', # not C
+    'H': '[ACT]', # not G
+    'V': '[ACG]', # not T
+    'N': '[ACGT]' # aNy
+}
 
 import re
 
@@ -28,6 +44,17 @@ import re
 def convert_phred(letter: str) -> int:
     '''Converts a single character into a phred score'''
     return ord(letter)-33 
+
+# Convert a motif with IUPAC codes into a regular expression pattern
+def convert_motif(motif: str) -> str:
+    '''Converts a motif with IUPAC codes into a regular expression pattern'''
+    pattern = ""
+    for char in motif.upper():
+        if char in IUPAC:
+            pattern += IUPAC.get(char, char)
+        else:
+            raise ValueError(f"Invalid character '{char}' in motif. Allowed characters are: {', '.join(IUPAC.keys())}")
+    return pattern
 
 # Loop below uses convert_phred to print out a converted string
 # for i, letter in enumerate(phred_score):
@@ -208,6 +235,8 @@ def parse_line(line):
     strand = True if (flag & 16) else False
     return(umi, flag, chrom, pos, cig, strand, line)
 
+
+
 def stranded(flag: int) -> bool: 
     """Returns True if the read is mapped to the reverse strand, False otherwise.""" 
     return (flag & 16) == 16
@@ -254,7 +283,6 @@ def adjust_pos(pos:int, cig:str, flag:int) -> int:
         trailing_clip = cases[-1][0] if cases and cases[-1][1] in ("S") else 0
         return end + trailing_clip
     
-
 
 if __name__ == "__main__":
     # write tests for functions above, Leslie has already populated some tests for convert_phred
