@@ -23,13 +23,12 @@ left_margin = 180
 right_margin = 20
 top_margin = 20
 bottom_margin = 120
-scale_factor = 10
 
-row_height = 110
-baseline_offset = 55
+row_height = 140
+baseline_offset = 70
 
 exon_height = 18
-motif_height = 10
+motif_height = 18
 motif_y_gap = 10
 
 font_main = 14
@@ -43,12 +42,12 @@ PALETTE = [
     (0.60, 0.30, 0.70),
     (0.70, 0.65, 0.20),
 ]
-TARGET_SEQ_WIDTH = 1400  # pixels for the longest sequence region
+TARGET_SEQ_WIDTH = 2200  # pixels for the longest sequence region
 
 COLOR_TEXT = (0.05, 0.05, 0.05)
 COLOR_INTRON = (0.55, 0.55, 0.55)
 COLOR_EXON = (0.15, 0.15, 0.15)
-MOTIF_ALPHA = 0.35
+MOTIF_ALPHA = 0.55
 
 #----------------------------------------------------------------------------
 # CLASS: Exon
@@ -94,6 +93,11 @@ class Motif:
         y = (y_baseline - exon_height / 2) - motif_y_gap - motif_height
         ctx.rectangle(x, y, w, motif_height)
         ctx.fill()
+        # trying an outline for visibility
+        ctx.set_source_rgba(0, 0, 0, 0.35)
+        ctx.set_line_width(1)
+        ctx.rectangle(x, y, w, motif_height)
+        ctx.stroke()
 
                    
 
@@ -259,6 +263,68 @@ def add_motifs(genes: list[Gene], motif_names: list[str]):
        gene.motifs = hits 
    return color_map
 
+def is_in_exon(gene: Gene, start: int, end: int) -> bool:
+    """
+    Return True if the motif hit overlaps ANY exon region.
+    Exons are uppercase runs stored as Exon objects in gene.exons.
+    """
+    for exon in gene.exons:
+        # overlap test for half-open intervals [start,end) and [exon.start, exon.end)
+        if not (end <= exon.start or exon.end <= start):
+            return True
+    return False
+
+
+def write_motif_stats(genes: list[Gene], out_tsv: str) -> None:
+    """
+    Write a TSV of all motif hits + a summary section at the top.
+    """
+    # counts across all genes
+    total_counts: dict[str, int] = {}
+    exon_counts: dict[str, int] = {}
+    intron_counts: dict[str, int] = {}
+
+    # collect rows
+    rows = []
+    for gene in genes:
+        for hit in gene.motifs:
+            motif = hit.name
+            total_counts[motif] = total_counts.get(motif, 0) + 1
+
+            in_exon = is_in_exon(gene, hit.start, hit.end)
+            if in_exon:
+                exon_counts[motif] = exon_counts.get(motif, 0) + 1
+            else:
+                intron_counts[motif] = intron_counts.get(motif, 0) + 1
+
+            # both coordinate styles (0-based and 1-based)
+            rows.append((
+                gene.header,
+                gene.length,
+                motif,
+                hit.start,          # 0-based start
+                hit.end,            # 0-based end (exclusive)
+                hit.start + 1,      # 1-based start
+                hit.end,            # 1-based end (inclusive if you interpret end-exclusive carefully)
+                "exon" if in_exon else "intron"
+            ))
+
+    # write file
+    with open(out_tsv, "w") as out:
+        # summary
+        out.write("# motif summary (all genes)\n")
+        out.write("# motif\ttotal_hits\texon_hits\tintron_hits\n")
+        motifs_sorted = sorted(total_counts.keys())
+        for m in motifs_sorted:
+            out.write(
+                f"{m}\t{total_counts.get(m,0)}\t{exon_counts.get(m,0)}\t{intron_counts.get(m,0)}\n"
+            )
+
+        out.write("\n# hit list\n")
+        out.write("gene_header\tgene_length\tmotif\tstart0\tend0_excl\tstart1\tend1\toverlaps_exon\n")
+        for r in rows:
+            out.write("\t".join(map(str, r)) + "\n")
+
 #----------------------------------------------------------------------------
 # CLASS: MotifFigure
 # This class represents the overall figure for visualizing motifs in genes.
@@ -378,7 +444,10 @@ def __main__():
     figure.render()
     print(f"Wrote: {out_png}")
 
-
+    # write stats TSV next to the PNG
+    out_tsv = prefix + "_motif_stats.tsv"
+    write_motif_stats(genes, out_tsv)
+    print(f"Wrote: {out_tsv}")
 
 
 
