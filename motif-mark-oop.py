@@ -1,12 +1,29 @@
-"""
-
-
-
+#!/usr/bin/env python3
 
 """
+motif-mark-oop.py
 
+Visualize motif occurrences within gene sequences using Pycairo.
 
+1. Reads a FASTA file in which exons are UPPERCASE, and introns are lowercase letters
+2. Reads a motif file and stores possible motifs - can include IUPAC ambiguity codes, converted to regex using bioinfo.convert_motif() (separate script)
+3. Finds all motifs in each gene sequence from the FASTA file
+4. Generates a .png image that visualizes all gene sequences, their introns/exons, and motifs (including overlaps)
+5. Writes out a stats summary of counts in .tsv format
 
+Usage: 
+
+python motif-mark-oop.py -f /Figure_1.fasta -m Fig_1_motifs.txt
+
+Outputs: 
+Figure_1.png
+Figure_1_motif_stats.tsv
+
+Requires:
+-pycairo
+-bioinfo module with convert_motif() 
+
+"""
 
 import math
 import os
@@ -49,11 +66,18 @@ COLOR_INTRON = (0.55, 0.55, 0.55)
 COLOR_EXON = (0.15, 0.15, 0.15)
 MOTIF_ALPHA = 0.55
 
+
+
 #----------------------------------------------------------------------------
+# Data Classes
+#----------------------------------------------------------------------------
+
+#----------------------------------------------------
 # CLASS: Exon
 # This class represents an exon region of a sequence.
-#----------------------------------------------------------------------------
-""" This class represents an exon region of a sequence. It stores the name of the exon, its start and end positions, and a reference to the parent Sequence object. The __repr__ method provides a string representation of the Exon object for debugging purposes. """
+#----------------------------------------------------
+
+""" This class represents an exon region of a sequence. It stores the name of the exon, its start and end positions, and a reference to the parent Sequence object. """
 
 class Exon: 
     def __init__(self, start:int, end: int, gene_number: int):
@@ -73,10 +97,13 @@ class Exon:
 
 #----------------------------------------------------------------------------
 # CLASS: Motif
-# This class represents an input motif.
+# This class represents a single motif occurrence on a gene.
 #----------------------------------------------------------------------------
 
 class Motif:
+    """
+    This class represents a single motif occurrence on a gene. It stores start and end position, as well as a reference to the parent sequence. 
+    """
     def __init__(self, name:str, start:int, end: int, gene_number: int, color: tuple[float, float, float]):
         self.name = name
         self.start = start
@@ -85,7 +112,7 @@ class Motif:
         self.color = color 
 
    
-    def draw(self, ctx:cairo.Context, x0: float, px_per_base: float, y_baseline: float):
+    def draw(self, ctx:cairo.Context, x0: float, px_per_base: float, y_baseline: float): # Draws the hit as a transparent rectangle with an outline for easier visibility onto the Cairo context
         r, g, b = self.color
         ctx.set_source_rgba(r, g, b, MOTIF_ALPHA)
         x = x0 + self.start * px_per_base
@@ -93,7 +120,7 @@ class Motif:
         y = (y_baseline - exon_height / 2) - motif_y_gap - motif_height
         ctx.rectangle(x, y, w, motif_height)
         ctx.fill()
-        # trying an outline for visibility
+        # Outline for visibility
         ctx.set_source_rgba(0, 0, 0, 0.35)
         ctx.set_line_width(1)
         ctx.rectangle(x, y, w, motif_height)
@@ -104,11 +131,10 @@ class Motif:
 #----------------------------------------------------------------------------
 # CLASS: Gene
 # This class represents an input fasta record.
-# Stores header, sequence, and computes exon and intron sequences based on the feature class.
 # ----------------------------------------------------------------------------
 class Gene:
     def __init__(self, header:str, seq:str, gene_number: int):
-        '''This class represents an input fasta record.'''
+        '''This class represents an input fasta record. Stores header, sequence, and computes exon and intron sequences based on the feature class.'''
         self.header = header.strip()
         self.seq = seq.strip()
         self.gene_number = gene_number
@@ -324,7 +350,11 @@ def write_motif_stats(genes: list[Gene], out_tsv: str) -> None:
         out.write("gene_header\tgene_length\tmotif\tstart0\tend0_excl\tstart1\tend1\toverlaps_exon\n")
         for r in rows:
             out.write("\t".join(map(str, r)) + "\n")
-
+            
+            
+#----------------------------------------------------------------------------
+# Generating the Context drawing
+#----------------------------------------------------------------------------
 #----------------------------------------------------------------------------
 # CLASS: MotifFigure
 # This class represents the overall figure for visualizing motifs in genes.
