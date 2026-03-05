@@ -6,7 +6,7 @@ motif-mark-oop.py
 Visualize motif occurrences within gene sequences using Pycairo.
 
 1. Reads a FASTA file in which exons are UPPERCASE, and introns are lowercase letters
-2. Reads a motif file and stores possible motifs - can include IUPAC ambiguity codes, converted to regex using bioinfo.convert_motif() (separate script)
+2. Reads a motif file and stores possible motifs - can include IUPAC ambiguity codes, converted to regex using convert_motif() (found in helper functions section)
 3. Finds all motifs in each gene sequence from the FASTA file
 4. Generates a .png image that visualizes all gene sequences, their introns/exons, and motifs (including overlaps)
 5. Writes out a stats summary of counts in .tsv format
@@ -21,7 +21,6 @@ Figure_1_motif_stats.tsv
 
 Requires:
 -pycairo
--bioinfo module with convert_motif() 
 
 """
 
@@ -216,6 +215,36 @@ class Gene:
 # Helper functions
 #----------------------------------------------------------------------------
 
+
+# IUPAC codes for degenerate bases, useful for motif searching. Also found in bioinfo.py script.
+
+IUPAC = {
+    'A': 'A', 'C': 'C', 'G': 'G', 'T': 'T', 'U': '[TU]',
+    'R': '[AG]',  # puRine
+    'Y': '[CT]',  # pYrimidine
+    'S': '[GC]',  # Strong
+    'W': '[AT]',  # Weak
+    'K': '[GT]',  # Keto
+    'M': '[AC]',  # aMino
+    'B': '[CGT]', # not A
+    'D': '[AGT]', # not C
+    'H': '[ACT]', # not G
+    'V': '[ACG]', # not T
+    'N': '[ACGT]' # aNy
+}
+
+# Convert a motif with IUPAC codes into a regular expression pattern. Also found in bioinfo.py script.
+
+def convert_motif(motif: str) -> str:
+    '''Converts a motif with IUPAC codes into a regular expression pattern'''
+    pattern = ""
+    for char in motif.upper():
+        if char in IUPAC:
+            pattern += IUPAC.get(char, char)
+        else:
+            raise ValueError(f"Invalid character '{char}' in motif. Allowed characters are: {', '.join(IUPAC.keys())}")
+    return pattern
+
 def parse_fasta(fasta_file: str) -> list[Gene]:
     """Parses a FASTA file and returns a list of Seq objects. Multi lines are joined into one string."""
     genes = []
@@ -248,6 +277,9 @@ def parse_motifs(motif_file: str) -> list[str]:
             if motif:
                 motifs.append(motif)
     return motifs
+
+# Uncomment this section to remove overlapping motifs and switch to staggered motifs. Must also change 
+#     ctx.set_source_rgba(r, g, b, MOTIF_ALPHA) -> ctx.set_source_rgb and remove all MOTIF_ALPHA vals. 
 
 # def assign_motif_lanes(motifs: list[Motif]) -> int:
 #     """Assigns lane numbers to motifs to avoid overlaps in the visualization. 
@@ -351,7 +383,7 @@ def write_motif_stats(genes: list[Gene], out_tsv: str) -> None:
         for r in rows:
             out.write("\t".join(map(str, r)) + "\n")
             
-            
+
 #----------------------------------------------------------------------------
 # Generating the Context drawing
 #----------------------------------------------------------------------------
@@ -467,8 +499,6 @@ def __main__():
 
     prefix, _ = os.path.splitext(args.f)
     out_png = prefix + ".png"
-
-    outdir = "/Users/amandadougherty/bioinfo/Bi625/motif-mark/motif-mark"
   
     figure = MotifFigure(genes, motifs, motif_colors, out_png)
     figure.render()

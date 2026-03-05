@@ -18,6 +18,9 @@ Requires installation of python, pycairo
 - [Bioinfo.py](bioinfo.py) 
     - Script needs a function `convert_motif(motif:str) -> str' to convert motif strings including IUPAC ambiguity codes (also defined within bioinfo.py)
 
+    - EDIT: this script no longer requires bioinfo.py. All necessary functions are in the main script. 
+
+    
 - Example outputs:
     ![rendered pycairo drawing of motifs from a test file](Tests/Figure_1.png)
 
